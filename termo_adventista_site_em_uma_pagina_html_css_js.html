@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Palavra da Lição — Termo Adventista</title>
+  <meta name="description" content="Jogo estilo Termo/Wordle para usar com a lição da semana. Configure a palavra, acrescente um verso/dica e compartilhe o resultado." />
+  <style>
+    :root{
+      --bg:#0b0f0e;            /* fundo escuro, discreto */
+      --panel:#111716;         /* cartões */
+      --text:#e9f1ee;          /* texto principal */
+      --muted:#98a6a1;         /* texto secundário */
+      --accent:#4caf50;        /* botões e ênfases */
+      --tile:#1a2321;          /* quadrados vazios */
+      --tile-border:#2b3532;   /* bordas dos quadrados */
+      --correct:#2ecc71;       /* verde */
+      --present:#f1c40f;       /* amarelo */
+      --absent:#546e7a;        /* cinza frio */
+      --warn:#ff7675;          /* avisos */
+      --focus:#80cbc4;         /* foco */
+      --shadow:0 10px 30px rgba(0,0,0,.25);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1100px 600px at 100% -10%, rgba(76,175,80,.10), transparent 60%),
+                  radial-gradient(1200px 800px at -10% 120%, rgba(241,196,15,.10), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:18px 16px; position:sticky; top:0; backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(11,15,14,.9), rgba(11,15,14,.7));
+      border-bottom:1px solid #1f2624;
+      z-index:50;
+    }
+    h1{
+      margin:0; font-size: clamp(18px, 2.6vw, 26px); letter-spacing:.5px; font-weight:700;
+      display:flex; align-items:center; gap:10px;
+    }
+    h1 span.logo{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, var(--accent), #7fd67d); color:#0a0e0d; font-weight:800}
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    button{appearance:none; border:none; background:var(--panel); color:var(--text); padding:10px 12px; border-radius:12px; cursor:pointer; box-shadow: var(--shadow); border:1px solid #1e2624; font-weight:600}
+    button:hover{filter:brightness(1.05)}
+    button:active{transform:translateY(1px)}
+    button.primary{background:var(--accent); color:#07110f}
+    button.ghost{background:transparent; border:1px solid #2a332f}
+
+    main{max-width:720px; margin:24px auto; padding:0 16px 32px}
+    .subtitle{margin:6px 0 16px; color:var(--muted); font-size:.95rem}
+
+    .grid{display:grid; gap:8px; justify-content:center; margin:18px auto 12px}
+    .row{display:grid; grid-template-columns: repeat(var(--cols), 56px); gap:8px}
+    .tile{width:56px; height:56px; border-radius:10px; border:1px solid var(--tile-border); background:var(--tile); display:grid; place-items:center; font-weight:800; font-size:24px; text-transform:uppercase; letter-spacing:1px; position:relative; transform-style:preserve-3d; transition: transform .4s ease}
+    .tile.filled{border-color:#3b4744}
+    .tile.flip{transform:rotateX(180deg)}
+    .tile[data-state="correct"]{background:var(--correct); border-color:transparent; color:#04130a}
+    .tile[data-state="present"]{background:var(--present); border-color:transparent; color:#221a02}
+    .tile[data-state="absent"]{background:var(--absent); border-color:transparent; color:#0e1416}
+
+    .keyboard{display:grid; gap:8px; grid-template-rows: auto auto auto; justify-content:center; margin-top:10px}
+    .keyrow{display:flex; gap:8px; justify-content:center}
+    .key{min-width:36px; height:48px; padding:0 10px; border-radius:10px; background:#1b2422; color:var(--text); border:1px solid #2a332f; display:grid; place-items:center; font-weight:700; cursor:pointer; user-select:none}
+    .key[data-state="correct"]{background:var(--correct); color:#04130a}
+    .key[data-state="present"]{background:var(--present); color:#221a02}
+    .key[data-state="absent"]{background:var(--absent); color:#0e1416}
+    .key.wide{min-width:64px}
+
+    .info{min-height:24px; margin:10px 0 2px; color:var(--muted)}
+    .info strong{color:var(--focus)}
+
+    .card{background:var(--panel); border:1px solid #1e2624; border-radius:var(--radius); box-shadow:var(--shadow)}
+    .pad{padding:16px}
+
+    dialog{background:var(--panel); border:1px solid #26302d; color:var(--text); border-radius:16px; width:min(680px, 92vw)}
+    dialog::backdrop{background: rgba(0,0,0,.6)}
+    .dialog-header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid #202826}
+    .dialog-body{padding:14px}
+    .dialog-footer{display:flex; gap:8px; justify-content:flex-end; padding:12px 14px; border-top:1px solid #202826}
+
+    label{display:block; margin:10px 0 6px; font-weight:600}
+    input[type="text"], textarea{width:100%; padding:12px 12px; border-radius:12px; background:#0e1413; color:var(--text); border:1px solid #2a332f; outline:none}
+    textarea{min-height:96px; resize:vertical}
+    .grid2{display:grid; gap:12px; grid-template-columns:1fr 1fr}
+    @media (max-width:700px){ .grid2{grid-template-columns:1fr} }
+
+    footer{max-width:720px; margin:28px auto; padding:0 16px 40px; color:var(--muted); font-size:.9rem}
+    footer a{color:var(--focus); text-decoration:none}
+
+    .pill{display:inline-flex; align-items:center; gap:8px; background:#0f1514; border:1px solid #1f2826; border-radius:999px; padding:6px 10px; margin:6px 4px 0 0; font-size:.9rem}
+
+    .badge{font-weight:800; background:linear-gradient(135deg, #7fd67d, var(--accent)); color:#052219; border-radius:999px; padding:2px 8px;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="logo">✦</span> Palavra da Lição <span class="badge">Beta</span></h1>
+    <div class="controls">
+      <button id="btnHint" class="ghost" title="Ver dica/verso">💡 Dica</button>
+      <button id="btnShare" class="ghost" title="Compartilhar resultado">📤 Compartilhar</button>
+      <button id="btnReset" class="ghost" title="Reiniciar partida">🔄 Reiniciar</button>
+      <button id="btnConfig" class="primary" title="Configurar palavra, título e verso">⚙️ Config</button>
+      <button id="btnTests" class="ghost" title="Executar testes">🧪 Testes</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card pad">
+      <div class="subtitle">Um jogo diário para a <strong>Lição da Escola Sabatina</strong>. Defina uma palavra-chave da lição (ex.: <em>graça</em>, <em>fé</em>, <em>salomão</em>) e convide o grupo a descobrir em até 6 tentativas.</div>
+      <div id="meta" class="pill" aria-live="polite">Lição: <strong id="lessonTitle">Fidelidade</strong> • Letras: <strong id="letterCount">5</strong></div>
+      <div class="info" id="info" role="status" aria-live="polite"></div>
+      <div id="grid" class="grid" aria-label="tabuleiro"></div>
+      <div id="keyboard" class="keyboard" aria-label="teclado virtual"></div>
+    </div>
+  </main>
+
+  <footer>
+    Dica: letras com acentos (á, é, ã, ç) são <strong>aceitas</strong>, mas a conferência ignora acentos para facilitar. <br/>
+    <details style="margin-top:8px">
+      <summary>Como usar com seu grupo da Lição</summary>
+      <ol>
+        <li>Clique em <strong>⚙️ Config</strong> e defina a <em>palavra</em>, o <em>título da lição</em> e (opcional) um <em>verso-chave/dica</em>.</li>
+        <li>Use <strong>Gerar link</strong> para criar uma URL com a resposta codificada (letra miúda: não é 100% à prova de curiosos).</li>
+        <li>Envie o link ao seu grupo. Cada pessoa joga no próprio celular.</li>
+        <li>Depois, toque <strong>📤 Compartilhar</strong> para copiar o quadradinho de cores e comemorar nos grupos. 😉</li>
+      </ol>
+    </details>
+  </footer>
+
+  <!-- Dica / Verso -->
+  <dialog id="hintModal">
+    <div class="dialog-header">
+      <strong>💡 Dica — Verso-chave</strong>
+      <button onclick="this.closest('dialog').close()" class="ghost">Fechar</button>
+    </div>
+    <div class="dialog-body" id="hintBody">Sem dica ainda. Abra ⚙️ Config para adicionar um verso ou referência.</div>
+    <div class="dialog-footer">
+      <button onclick="document.getElementById('hintModal').close()" class="primary">Entendi</button>
+    </div>
+  </dialog>
+
+  <!-- Copiar manualmente (fallback) -->
+  <dialog id="copyModal">
+    <div class="dialog-header">
+      <strong id="copyTitle">Copiar manualmente</strong>
+      <button onclick="this.closest('dialog').close()" class="ghost">Fechar</button>
+    </div>
+    <div class="dialog-body">
+      <p id="copyHelp" class="subtitle">Selecione o conteúdo abaixo, pressione <strong>Ctrl/Cmd+C</strong> e cole onde desejar.</p>
+      <textarea id="copyArea" readonly></textarea>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+        <button id="btnSelectAll" class="ghost">Selecionar tudo</button>
+        <button id="btnCopyFallback" class="primary">Copiar (fallback)</button>
+        <button id="btnDownloadTxt" class="ghost">Baixar .txt</button>
+        <a id="btnOpenLink" class="ghost" href="#" target="_blank" rel="noopener" style="display:none; text-decoration:none; line-height:40px; padding:10px 12px; border-radius:12px; border:1px solid #2a332f">Abrir link</a>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Configurações -->
+  <dialog id="configModal">
+    <form method="dialog">
+      <div class="dialog-header">
+        <strong>⚙️ Configurações da Lição</strong>
+        <div style="display:flex; gap:8px">
+          <button class="ghost" id="btnGenerateLink" type="button">Gerar link</button>
+          <button class="primary" id="btnApply" value="apply">Aplicar</button>
+          <button class="ghost" value="cancel">Fechar</button>
+        </div>
+      </div>
+      <div class="dialog-body">
+        <div class="grid2">
+          <div>
+            <label for="wordInput">Palavra (sem espaços)</label>
+            <input id="wordInput" type="text" maxlength="16" placeholder="Ex.: graça, fé, sábado, salomão" />
+            <div class="subtitle">Letras: <strong id="cfgLetters">0</strong> • Dica: use uma única palavra curta (4–10 letras).</div>
+          </div>
+          <div>
+            <label for="titleInput">Título da lição</label>
+            <input id="titleInput" type="text" maxlength="80" placeholder="Ex.: Fidelidade Radical" />
+          </div>
+        </div>
+        <label for="hintInput">Verso-chave / Dica</label>
+        <textarea id="hintInput" placeholder="Ex.: 'Sê fiel até à morte, e dar-te-ei a coroa da vida.' (Ap 2:10)"></textarea>
+        <div class="subtitle">Privacidade: com este site em arquivo único, a palavra fica salva no link ou no seu navegador. Para mais sigilo, troque a palavra com frequência.</div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Testes -->
+  <dialog id="testsModal">
+    <div class="dialog-header">
+      <strong>🧪 Testes automáticos</strong>
+      <button onclick="this.closest('dialog').close()" class="ghost">Fechar</button>
+    </div>
+    <div class="dialog-body">
+      <div id="testsOutput" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace"></div>
+    </div>
+    <div class="dialog-footer">
+      <button class="primary" id="btnRunTests">Executar testes novamente</button>
+    </div>
+  </dialog>
+
+  <script>
+    // ===================== Utilidades =====================
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    const Storage = {
+      read(key, dflt){ try{ return JSON.parse(localStorage.getItem(key)) ?? dflt }catch{ return dflt } },
+      write(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)) }catch{} }
+    }
+
+    // Normaliza: remove acentos, trata Ç -> C, mantém só letras
+    function normalizeLetters(str){
+      if(!str) return '';
+      const cleaned = str
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove diacríticos
+        .replace(/[çÇ]/g,'c')
+        .replace(/[^a-zA-Z]/g,'');
+      return cleaned.toLowerCase();
+    }
+
+    // Mantém visual com acento, mas força maiúsculas
+    function prettyUpper(str){ return (str||'').toLocaleUpperCase('pt-BR'); }
+
+    // Base64 compatível com unicode
+    function b64e(str){ return btoa(unescape(encodeURIComponent(str))) }
+    function b64d(str){ try{ return decodeURIComponent(escape(atob(str))) }catch{ return '' } }
+
+    function qsParam(name){ const url = new URL(location.href); return url.searchParams.get(name) }
+
+    // ===================== Estado do Jogo =====================
+    const DEFAULTS = {
+      title: 'Fidelidade',
+      wordRaw: 'GRAÇA',
+      hint: '“Sê fiel até à morte, e dar-te-ei a coroa da vida.” (Ap 2:10)'
+    };
+
+    const persisted = Storage.read('termoAdventista.config', {});
+
+    // Carrega de URL se houver
+    let cfg = {
+      title: b64d(qsParam('t')) || persisted.title || DEFAULTS.title,
+      wordRaw: b64d(qsParam('w')) || persisted.wordRaw || DEFAULTS.wordRaw,
+      hint: b64d(qsParam('h')) || persisted.hint || DEFAULTS.hint,
+    };
+
+    // Palavra alvo (normalizada p/ lógica) e comprimento
+    let targetRaw = cfg.wordRaw.trim();
+    function sanitizedRaw(str){
+      // Remove espaços/hífens, mantém acentos/ç para exibir bonito
+      return prettyUpper((str||'').replace(/[^\p{L}]/gu, ''));
+    }
+    targetRaw = sanitizedRaw(targetRaw);
+    let target = normalizeLetters(targetRaw);
+
+    const attemptsMax = 6;
+    let cols = Math.min(Math.max(target.length, 4), 10); // 4..10
+
+    let state = {
+      row: 0,
+      col: 0,
+      guesses: Array.from({length: attemptsMax}, () => ''),
+      status: Array.from({length: attemptsMax}, () => Array(cols).fill('')),
+      finished: false,
+      win: false,
+    };
+
+    function saveProgress(){
+      const key = 'termoAdventista.'+b64e(target);
+      Storage.write(key, state);
+    }
+
+    function loadProgress(){
+      const key = 'termoAdventista.'+b64e(target);
+      const s = Storage.read(key);
+      if(s && s.guesses && s.status){ state = s; }
+    }
+
+    // ===================== Clipboard seguro com fallback =====================
+    async function writeTextSafe(text, {hintTitle='Copiar manualmente', hintIsLink=false}={}){
+      // 1) Web Share API (móvel), se disponível
+      try{
+        if(navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+          await navigator.share({ text });
+          setInfo('Compartilhado via sistema.');
+          return {ok:true, method:'share'};
+        }
+      }catch(e){ /* ignora e tenta próximos */ }
+
+      // 2) Clipboard API (contexto seguro e com permissão)
+      if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText){
+        try{
+          await navigator.clipboard.writeText(text);
+          setInfo('Conteúdo copiado para a área de transferência.');
+          return {ok:true, method:'clipboard'};
+        }catch(e){
+          // Pode falhar por política de permissões; prossegue para fallback
+        }
+      }
+
+      // 3) Fallback: execCommand("copy")
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly','');
+        ta.style.position='fixed'; ta.style.top='-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if(ok){ setInfo('Conteúdo copiado (fallback).'); return {ok:true, method:'execCommand'}; }
+      }catch(e){ /* segue para modal */ }
+
+      // 4) Último recurso: abrir modal para copiar manualmente
+      openCopyModal(text, {title: hintTitle, isLink: hintIsLink});
+      setInfo('Copie manualmente no modal aberto.');
+      return {ok:false, method:'manual'};
+    }
+
+    function openCopyModal(text, {title='Copiar manualmente', isLink=false}={}){
+      $('#copyTitle').textContent = title;
+      $('#copyArea').value = text;
+      $('#copyHelp').innerHTML = isLink ? 'Se preferir, clique em <strong>Abrir link</strong> ou selecione e copie o endereço abaixo.' : 'Selecione o conteúdo e pressione <strong>Ctrl/Cmd+C</strong> para copiar.';
+      const a = $('#btnOpenLink');
+      if(isLink){ a.style.display='inline-block'; a.href = text; } else { a.style.display='none'; a.href = '#'; }
+      $('#copyModal').showModal();
+      setTimeout(()=>{ $('#copyArea').focus(); $('#copyArea').select(); }, 60);
+    }
+
+    function downloadText(filename, content){
+      const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    // ===================== Construção da UI =====================
+    function buildGrid(){
+      const grid = $('#grid');
+      grid.innerHTML = '';
+      grid.style.setProperty('--cols', cols);
+      for(let r=0;r<attemptsMax;r++){
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.dataset.row = r;
+        for(let c=0;c<cols;c++){
+          const t = document.createElement('div');
+          t.className = 'tile';
+          t.dataset.row = r; t.dataset.col = c;
+          row.appendChild(t);
+        }
+        grid.appendChild(row);
+      }
+    }
+
+    const KEY_ROWS = [
+      [...'QWERTYUIOP'],
+      [...'ASDFGHJKLÇ'],
+      ['ENTER', ...'ZXCVBNM', '⌫']
+    ];
+
+    function buildKeyboard(){
+      const kb = $('#keyboard');
+      kb.innerHTML = '';
+      kb.className = 'keyboard';
+      KEY_ROWS.forEach((row)=>{
+        const line = document.createElement('div');
+        line.className = 'keyrow';
+        row.forEach(k=>{
+          const b = document.createElement('div');
+          b.className = 'key';
+          b.textContent = k.length===1 ? k : (k==='ENTER'?'Enter':'Apagar');
+          if(k.length>1) b.classList.add('wide');
+          b.dataset.key = k;
+          b.addEventListener('click', () => handleKey(k));
+          line.appendChild(b);
+        });
+        kb.appendChild(line);
+      });
+    }
+
+    function updateMeta(){
+      $('#lessonTitle').textContent = cfg.title || '—';
+      $('#letterCount').textContent = cols;
+      $('#hintBody').textContent = cfg.hint || 'Sem dica no momento.';
+      $('#info').textContent = `Descubra a palavra em ${attemptsMax} tentativas.`;
+      $('#wordInput').value = targetRaw;
+      $('#titleInput').value = cfg.title || '';
+      $('#hintInput').value = cfg.hint || '';
+      $('#cfgLetters').textContent = cols;
+    }
+
+    function renderAll(){
+      for(let r=0;r<attemptsMax;r++){
+        const guess = state.guesses[r] || '';
+        for(let c=0;c<cols;c++){
+          const tile = document.querySelector(`.tile[data-row="${r}"][data-col="${c}"]`);
+          const ch = guess[c] || '';
+          tile.textContent = ch ? prettyUpper(ch) : '';
+          const st = state.status[r][c];
+          tile.dataset.state = st || '';
+          tile.classList.toggle('filled', !!ch);
+        }
+      }
+      updateKeyboardColors();
+      saveProgress();
+    }
+
+    function setInfo(msg, type=''){
+      const info = $('#info');
+      info.textContent = msg;
+      info.style.color = type==='warn'? 'var(--warn)' : 'var(--muted)';
+    }
+
+    // ===================== Lógica do jogo =====================
+    function handleKey(k){
+      if(state.finished) return;
+      if(k==='ENTER') return onEnter();
+      if(k==='⌫') return onBackspace();
+      if(k.length===1){ addLetter(k); }
+    }
+
+    function addLetter(ch){
+      if(state.col>=cols) return;
+      const letter = normalizeLetters(ch)[0];
+      if(!letter) return; // ignora não-letras
+      const r = state.row, c = state.col;
+      state.guesses[r] = (state.guesses[r] || '') + letter;
+      state.col++;
+      renderAll();
+    }
+
+    function onBackspace(){
+      const r = state.row;
+      if(state.col<=0) return;
+      state.guesses[r] = state.guesses[r].slice(0,-1);
+      state.col--;
+      renderAll();
+    }
+
+    function onEnter(){
+      const r = state.row;
+      const guess = (state.guesses[r]||'');
+      if(guess.length<cols){ setInfo('Palavra incompleta.', 'warn'); return; }
+      // Avaliar
+      const res = evaluate(guess, target);
+      state.status[r] = res;
+      flipRow(r, res);
+      const isCorrect = res.every(s=>s==='correct');
+      if(isCorrect){
+        state.finished = true; state.win = true;
+        setTimeout(()=>{
+          setInfo('Parabéns! Você acertou.');
+          $('#hintModal').showModal();
+        }, 450);
+      } else if(r===attemptsMax-1){
+        state.finished = true; state.win = false;
+        setTimeout(()=>{
+          setInfo(`Fim de jogo! A palavra era ${prettyUpper(targetRaw)}.`);
+          $('#hintModal').showModal();
+        }, 450);
+      } else {
+        state.row++; state.col=0;
+        setInfo('Boa! Continue.');
+      }
+      renderAll();
+    }
+
+    function evaluate(guess, answer){
+      // Wordle-style: primeiro marca corretos, depois presentes com contagem
+      const L = answer.length; // usa comprimento da resposta
+      const res = Array(L).fill('absent');
+      const a = answer.split('');
+      const g = guess.split('');
+      const used = Array(L).fill(false);
+
+      // Marca corretos
+      for(let i=0;i<L;i++){
+        if(g[i]===a[i]){ res[i]='correct'; used[i]=true; g[i] = '✓'; }
+      }
+      // Mapa de frequências restantes
+      const freq = {};
+      for(let i=0;i<L;i++){
+        if(!used[i]){ freq[a[i]] = (freq[a[i]]||0)+1; }
+      }
+      // Marca presentes
+      for(let i=0;i<L;i++){
+        const ch = guess[i];
+        if(res[i]==='correct') continue;
+        if(freq[ch]>0){ res[i] = 'present'; freq[ch]--; }
+      }
+      return res;
+    }
+
+    function flipRow(r, res){
+      for(let c=0;c<cols;c++){
+        const tile = document.querySelector(`.tile[data-row="${r}"][data-col="${c}"]`);
+        setTimeout(()=>{
+          tile.classList.add('flip');
+          tile.dataset.state = res[c];
+        }, c*100);
+      }
+      setTimeout(()=>{
+        // remove classe flip para próxima linha não herdar estado 3D
+        for(let c=0;c<cols;c++){
+          const tile = document.querySelector(`.tile[data-row="${r}"][data-col="${c}"]`);
+          tile.classList.remove('flip');
+        }
+      }, cols*120 + 400);
+    }
+
+    function updateKeyboardColors(){
+      const map = {}; // letra -> highest state
+      const rank = { 'absent':0, 'present':1, 'correct':2 };
+      for(let r=0;r<attemptsMax;r++){
+        const guess = state.guesses[r]||'';
+        for(let c=0;c<guess.length;c++){
+          const ch = guess[c].toUpperCase();
+          const s = state.status[r][c];
+          if(!s) continue;
+          if(!(ch in map) || rank[s] > rank[map[ch]]) map[ch] = s;
+        }
+      }
+      $$('.key').forEach(k=>{
+        const ch = (k.dataset.key || '').toUpperCase();
+        const s = map[ch];
+        k.dataset.state = s || '';
+      })
+    }
+
+    // ===================== Eventos globais =====================
+    document.addEventListener('keydown', (ev)=>{
+      const key = ev.key;
+      if(key==='Enter') return handleKey('ENTER');
+      if(key==='Backspace') return handleKey('⌫');
+      if(/^[a-zA-ZçÇ]$/.test(key)) return handleKey(key.toUpperCase());
+    });
+
+    $('#btnHint').addEventListener('click', ()=> $('#hintModal').showModal());
+
+    $('#btnReset').addEventListener('click', ()=>{
+      if(confirm('Reiniciar a partida atual?')){
+        state = {
+          row:0, col:0,
+          guesses: Array.from({length: attemptsMax}, () => ''),
+          status: Array.from({length: attemptsMax}, () => Array(cols).fill('')),
+          finished:false, win:false,
+        };
+        setInfo('Partida reiniciada.');
+        renderAll();
+      }
+    });
+
+    $('#btnShare').addEventListener('click', async ()=>{
+      const title = cfg.title ? `Lição: ${cfg.title}` : 'Palavra da Lição';
+      const header = `${title} — ${state.win? state.row+"/":'X/'}${attemptsMax}`;
+      const blocks = state.status.map((row,i)=>{
+        if(!row.some(Boolean)) return '';
+        return row.map(s=> s==='correct'?'🟩': s==='present'?'🟨':'⬜').join('');
+      }).filter(Boolean).join('\n');
+      const text = `${header}\n${blocks}`.trim();
+      await writeTextSafe(text, {hintTitle:'Copie seu resultado'});
+    });
+
+    $('#btnConfig').addEventListener('click', ()=>{
+      updateMeta();
+      $('#configModal').showModal();
+    });
+
+    $('#btnGenerateLink').addEventListener('click', async ()=>{
+      // Lê campos atuais (sem fechar o modal)
+      const raw = sanitizedRaw($('#wordInput').value || targetRaw);
+      const title = $('#titleInput').value.trim() || cfg.title || '';
+      const hint = $('#hintInput').value.trim() || cfg.hint || '';
+      const url = new URL(location.href);
+      url.searchParams.set('w', b64e(raw));
+      url.searchParams.set('t', title? b64e(title):'');
+      url.searchParams.set('h', hint? b64e(hint):'');
+      const link = url.toString();
+      await writeTextSafe(link, {hintTitle:'Copie o link (ou abra abaixo)', hintIsLink:true});
+      // Também atualiza a barra do navegador (não obrigatório)
+      try{ history.replaceState(null, '', link); }catch{}
+    });
+
+    $('#btnApply').addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      const raw = sanitizedRaw($('#wordInput').value || targetRaw);
+      const nrm = normalizeLetters(raw);
+      if(nrm.length<4 || nrm.length>10){
+        alert('Use uma palavra entre 4 e 10 letras.');
+        return;
+      }
+      cfg.title = $('#titleInput').value.trim() || '';
+      cfg.hint = $('#hintInput').value.trim() || '';
+      cfg.wordRaw = raw;
+      Storage.write('termoAdventista.config', cfg);
+
+      // Atualiza alvo e reinicia jogo
+      targetRaw = raw; target = normalizeLetters(targetRaw); cols = target.length;
+      state = {
+        row:0, col:0,
+        guesses: Array.from({length: attemptsMax}, () => ''),
+        status: Array.from({length: attemptsMax}, () => Array(cols).fill('')),
+        finished:false, win:false,
+      };
+      buildGrid(); buildKeyboard(); updateMeta(); renderAll();
+      $('#configModal').close();
+      setInfo('Configurações aplicadas. Boa partida!');
+    });
+
+    // ====== Eventos do modal de cópia ======
+    $('#btnSelectAll').addEventListener('click', ()=>{ $('#copyArea').focus(); $('#copyArea').select(); });
+    $('#btnCopyFallback').addEventListener('click', ()=>{
+      $('#copyArea').focus(); $('#copyArea').select();
+      try{
+        const ok = document.execCommand('copy');
+        setInfo(ok? 'Copiado (fallback).' : 'Não foi possível copiar automaticamente, selecione e use Ctrl/Cmd+C.');
+      }catch{ setInfo('Selecione e use Ctrl/Cmd+C para copiar.'); }
+    });
+    $('#btnDownloadTxt').addEventListener('click', ()=>{
+      const text = $('#copyArea').value || '';
+      const name = (document.title||'resultado').replace(/\s+/g,'_').toLowerCase()+'.txt';
+      downloadText(name, text);
+    });
+
+    // ===================== Testes =====================
+    function runUnitTests(){
+      const out = [];
+      function assertEqual(name, a, b){ const ok = JSON.stringify(a)===JSON.stringify(b); out.push(`${ok?'✅':'❌'} ${name}\n  esperado: ${JSON.stringify(b)}\n  obtido:  ${JSON.stringify(a)}`); }
+
+      // Teste 1: normalizeLetters
+      assertEqual('normalizeLetters("GRAÇA")', normalizeLetters('GRAÇA'), 'graca');
+      assertEqual('normalizeLetters("fé123")', normalizeLetters('fé123'), 'fe');
+      assertEqual('normalizeLetters("Salomão")', normalizeLetters('Salomão'), 'salomao');
+
+      // Teste 2: evaluate — tudo correto
+      (function(){
+        const savedCols = cols; cols = 4;
+        const res = evaluate('casa','casa');
+        cols = savedCols;
+        assertEqual('evaluate("casa","casa")', res, ['correct','correct','correct','correct']);
+      })();
+
+      // Teste 3: evaluate — letras repetidas controladas
+      (function(){
+        // resposta: GRACA (g r a c a), palpite: ARARA (a r a r a)
+        const savedCols = cols; cols = 5;
+        const res = evaluate('arara','graca');
+        cols = savedCols;
+        assertEqual('evaluate("arara","graca")', res, ['absent','correct','correct','absent','correct']);
+      })();
+
+      // Teste 4: evaluate — presentes vs ausentes
+      (function(){
+        const savedCols = cols; cols = 5;
+        const res = evaluate('sabio','sabio');
+        cols = savedCols;
+        assertEqual('evaluate("sabio","sabio")', res, ['correct','correct','correct','correct','correct']);
+      })();
+
+      $('#testsOutput').textContent = out.join('\n\n');
+      return out.every(l => l.startsWith('✅'));
+    }
+
+    $('#btnTests').addEventListener('click', ()=>{ runUnitTests(); $('#testsModal').showModal(); });
+    $('#btnRunTests').addEventListener('click', ()=>{ runUnitTests(); });
+
+    // ===================== Inicialização =====================
+    function init(){
+      // Prepara UI
+      buildGrid();
+      buildKeyboard();
+      updateMeta();
+      loadProgress();
+      renderAll();
+      setInfo('Descubra a palavra em 6 tentativas.');
+    }
+
+    init();
+  </script>
+</body>
+</html>
